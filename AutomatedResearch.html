@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mermaid Flowchart</title>
+</head>
+<body>
+
+<pre class="mermaid">
+
+graph TD
+    %% ============================================================
+    %% ENTERPRISE AGENTIC REPORT GENERATION ARCHITECTURE
+    %% Features: Max-Retry Circuits, Tie-Breaker Logic,
+    %%           Decentralized QA, Observability Layer
+    %% ============================================================
+
+    %% ── Entry Point & Security ──────────────────────────────────
+    User([👤 User: defines topic & constraints])
+        --> InGuard[🛡️ Input Guardrails\nPII Redaction · Prompt Injection Check]
+    InGuard --> CacheHit{📦 Semantic\nCache Hit?}
+    CacheHit -- Yes --> Cached([⚡ Return Cached Report Instantly])
+    CacheHit -- No  --> Planner
+
+    %% ── Phase 1: Planning & Scope Alignment ─────────────────────
+    subgraph P1 [Phase 1 · Planning & Scope Alignment]
+        direction TB
+        Planner[🧠 Planner Agent\nGenerates scope & outline]
+        Planner --> P1Retry{Retry\nCircuit}
+        P1Retry -- Attempt 1-3 --> H1{👤 Human\napproves scope?}
+        P1Retry -- Max retries exceeded --> P1Fallback[⚠️ Escalate to Human\nwith partial draft]
+        H1 -- No · Provides Feedback --> Planner
+        H1 -- Yes --> Outline([✅ Approved Outline])
+    end
+
+    %% ── Phase 2: High-Fidelity Retrieval Loop ───────────────────
+    subgraph P2 [Phase 2 · High-Fidelity Retrieval Loop]
+        direction TB
+        QGen[🔍 Question Generator Agent\nRoutes async parallel queries]
+        QGen --> Search[🗄️ Hybrid Search\nVector DB · BM25 · Web · KB]
+        Search --> Rerank[📊 Cross-Encoder Reranker\nFilters noise & ranks relevance]
+        Rerank --> Eval[🔬 Evaluator Agent\nExtracts facts · Detects conflicts]
+
+        Eval --> P2Retry{Retry\nCircuit}
+        P2Retry -- Attempt 1-3 · Refines strategy --> QGen
+        P2Retry -- Sufficient data --> Suff{✅ Sufficient\nData?}
+        P2Retry -- Max retries exceeded --> P2Fallback[⚠️ Proceed with\nbest available data\n+ flag low-confidence]
+
+        Suff -- No --> QGen
+        Suff -- Yes --> Flag{⚠️ Critical Conflict\nor Sensitive Source?}
+        Flag -- Yes --> H2[👤 Human validates\nflagged sources via RBAC]
+        Flag -- No  --> Facts([📋 Validated Fact Base])
+        H2 --> Facts
+        P2Fallback --> Facts
+    end
+
+    %% ── Phase 3: Synthesis & Drafting ───────────────────────────
+    subgraph P3 [Phase 3 · Synthesis & Drafting]
+        direction TB
+        Synth[🗺️ Synthesizer Agent\nMaps extracted facts to outline]
+        Synth --> Writer[✍️ Writer Agent\nDrafts Intro → Body → Conclusion]
+    end
+
+    %% ── Phase 4: Decentralized QA & Finalization ────────────────
+    subgraph P4 [Phase 4 · Decentralized QA · No God Agent]
+        direction TB
+        Broadcast{📡 Broadcast Draft\nto Specialized Critics}
+
+        Broadcast --> FactCheck[🔎 Fact-Checker Agent\nVerifies claims vs Fact Base]
+        Broadcast --> ScopeCheck[🎯 Alignment Agent\nVerifies draft matches Phase 1 Outline]
+        Broadcast --> ToneCheck[🖊️ Format Agent\nChecks style · tone · length]
+
+        FactCheck  --> Agg[⚖️ Routing & Aggregation Node\nCollects all critic verdicts]
+        ScopeCheck --> Agg
+        ToneCheck  --> Agg
+
+        Agg --> TieBreak{🗳️ Tie-Breaker\nLogic}
+        TieBreak -- Unanimous Pass       --> Pass{✅ All Critics Pass?}
+        TieBreak -- Majority Pass 2 of 3 --> Pass
+        TieBreak -- Tie or Majority Fail --> WriterRetry
+
+        Pass -- No · Routes targeted failures --> WriterRetry{Retry\nCircuit}
+        WriterRetry -- Attempt 1-3 · Specific feedback --> Writer
+        WriterRetry -- Max retries exceeded --> P4Fallback[⚠️ Escalate to Human\nwith annotated draft]
+
+        Pass -- Yes --> OutGuard[🛡️ Output Guardrails\nToxicity · Data Leak Check]
+        OutGuard --> H3{👤 Human\nFinal Approval?}
+        H3 -- No · Requests tweaks --> Writer
+        H3 -- Yes --> SaveCache[(💾 Save to\nSemantic Cache DB)]
+        SaveCache --> Done([🏁 Final Report Delivered])
+        P4Fallback --> H3
+    end
+
+    %% ── Cross-Phase Wiring ──────────────────────────────────────
+    Outline --> QGen
+    Facts   --> Synth
+    Writer  --> Broadcast
+
+    %% ── Observability & Telemetry (side annotations) ────────────
+    subgraph OBS [🔭 Observability · Telemetry · Cost Monitoring  — Wraps All Phases]
+        direction LR
+        T1[📈 Token & Cost Tracker\nper agent call]
+        T2[⏱️ Latency Monitor\nP50 · P95 · P99]
+        T3[🔁 Retry & Circuit-Breaker\nLog — all phases]
+        T4[📊 RAGAS Metrics\nFaithfulness · Relevance · Precision]
+        T5[🪵 Audit Trail\nImmutable log of all decisions]
+    end
+
+    %% ── Styling ─────────────────────────────────────────────────
+    classDef human    fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef agent    fill:#cce5ff,stroke:#0056b3,stroke-width:2px,color:#004085;
+    classDef security fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404;
+    classDef data     fill:#e2e3e5,stroke:#6c757d,stroke-width:2px,color:#383d41;
+    classDef retry    fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24;
+    classDef fallback fill:#f9d0c4,stroke:#c0392b,stroke-width:2.5px,color:#7b241c;
+    classDef obs      fill:#eaf4fb,stroke:#2e86c1,stroke-width:1.5px,color:#1a5276;
+    classDef done     fill:#d5f5e3,stroke:#1e8449,stroke-width:2px,color:#145a32;
+
+    class H1,H2,H3 human;
+    class Planner,QGen,Eval,Synth,Writer,FactCheck,ScopeCheck,ToneCheck,Rerank agent;
+    class InGuard,OutGuard security;
+    class Outline,Facts,SaveCache data;
+    class P1Retry,P2Retry,WriterRetry retry;
+    class P1Fallback,P2Fallback,P4Fallback fallback;
+    class T1,T2,T3,T4,T5 obs;
+    class Done,Cached done;
+</pre>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+</script>
+
+</body>
+</html>

@@ -1,0 +1,269 @@
+# Agentic Automated Research Report Generation
+
+An agentic application for **end‑to‑end automated research report generation** with **Human‑in‑the‑Loop (HITL)** control. The system orchestrates multiple agents across **Research → Analysis → Generation**, enabling structured retrieval, synthesis, and report writing while allowing humans to guide, validate, and refine outputs at critical stages.
+
+---
+
+## Table of Contents
+
+1. Overview
+2. Key Concepts
+3. System Architecture
+4. Workflow
+5. Human‑in‑the‑Loop Design
+6. Agent & Node Design
+7. Subgraph: Retrieval & Search
+8. Report Generation Pipeline
+9. Report Writing Nodes
+10. Extensibility
+11. Example Flow
+12. Future Enhancements
+
+---
+
+## 1. Overview
+
+This application is designed to automatically generate high‑quality research reports by coordinating specialized agents. The system follows a **clear, auditable pipeline**:
+
+**Research → Analysis → Generation**
+
+At each major transition, a **human analyst** can intervene to:
+
+* Refine research goals
+* Approve or reject retrieved information
+* Adjust report structure or tone
+* Validate final conclusions
+
+This ensures both **automation efficiency** and **human accountability**.
+
+---
+
+## 2. Key Concepts
+
+* **Agentic System**: Multiple autonomous agents, each responsible for a well‑defined task.
+* **Human‑in‑the‑Loop (HITL)**: Humans actively guide and supervise agent decisions.
+* **Directed Graph Workflow**: Tasks are executed as nodes connected by deterministic or conditional edges.
+* **Subgraphs**: Logical groupings of nodes (e.g., Retrieval & Search) that can be reused or replaced.
+
+---
+
+## 3. System Architecture
+
+### Overall Flowchart
+
+```mermaid
+flowchart TD
+    A([Start]) --> B[Create Analyst Agent]
+    B --> C{Human-in-the-Loop
+Scope & Goal Review}
+
+    C -->|Approved| D[Research Subgraph]
+    C -->|Refine| B
+
+    subgraph Research_Subgraph [Research Subgraph]
+        D1[Retrieval Node]
+        D2[Search Node]
+        D3[Information Provider]
+
+        D1 --> D3
+        D2 --> D3
+    end
+
+    D --> D1
+
+    D3 --> E{Human-in-the-Loop
+Source Validation}
+    E -->|Approved| F[Analysis & Aggregation]
+    E -->|Reject / Refine| D1
+
+    F --> G[Generation Layer]
+
+    subgraph Generation_Layer [Report Writing Nodes]
+        G1[Introduction Node]
+        G2[Write Report Section Node]
+        G3[Conclusion Node]
+        G4[Finalize Report]
+
+        G1 --> G2 --> G3 --> G4
+    end
+
+    G --> G1
+
+    G3 --> H{Human-in-the-Loop
+Final Review}
+    H -->|Approved| I([Final Research Report])
+    H -->|Edit| G1
+```
+
+This flowchart represents the **full agentic lifecycle**, showing:
+
+* Clear stage separation (Research → Analysis → Generation)
+* Embedded Human-in-the-Loop decision points
+* Modular subgraphs for retrieval and report writing
+
+---
+
+## 4. Workflow
+
+### High‑Level Flow
+
+1. **Start**
+2. **Create Analyst Agent**
+3. **Human‑in‑the‑Loop Review**
+4. **Research Subgraph Execution**
+5. **Analysis & Aggregation**
+6. **Report Generation**
+7. **Human Validation & Finalization**
+
+---
+
+## 5. Human‑in‑the‑Loop Design
+
+Human intervention is intentionally placed at **high‑impact decision points**:
+
+* After analyst creation (scope & intent validation)
+* After retrieval & search (source quality check)
+* Before final report generation (structure & emphasis)
+* After conclusion drafting (accuracy & reasoning check)
+
+This hybrid approach balances **speed**, **accuracy**, and **trust**.
+
+---
+
+## 6. Agent & Node Design
+
+### Analyst Agent
+
+**Responsibilities:**
+
+* Understand research objectives
+* Break objectives into research questions
+* Decide which subgraphs to activate
+* Coordinate downstream agents
+
+**Inputs:**
+
+* Research topic
+* Constraints (time, depth, sources)
+
+**Outputs:**
+
+* Structured research plan
+
+---
+
+## 7. Subgraph: Retrieval & Search
+
+This subgraph focuses on gathering high‑quality information.
+
+### Nodes in the Subgraph
+
+1. **Retrieval Node**
+
+   * Pulls data from curated knowledge bases
+   * Uses embeddings or semantic search
+
+2. **Search Node**
+
+   * Performs live or indexed search queries
+   * Expands coverage beyond internal sources
+
+3. **Information Provider Node**
+
+   * Normalizes results
+   * Extracts key facts, citations, and summaries
+
+**Output:**
+
+* Clean, structured research material ready for analysis
+
+---
+
+## 8. Analysis & Aggregation
+
+The analysis layer:
+
+* Deduplicates information
+* Resolves contradictions
+* Identifies themes and gaps
+* Ranks evidence by relevance and credibility
+
+### Aggregation Step
+
+All validated information is combined into a **single structured knowledge object** that feeds the generation stage.
+
+---
+
+## 9. Report Generation Pipeline
+
+Once analysis is complete, the system transitions to **report writing**, composed of three core nodes.
+
+### Report Writing Nodes (3‑Node Design)
+
+#### 1. Introduction Node
+
+* Provides context and background
+* Defines the research scope
+* Outlines report structure
+
+#### 2. Write Report Section Node
+
+* Generates the main body sections
+* Integrates evidence and analysis
+* Maintains logical flow and citations
+
+#### 3. Conclusion Node
+
+* Synthesizes key findings
+* Answers the original research questions
+* Highlights implications and limitations
+
+Each node can be reviewed or edited by a human before proceeding.
+
+---
+
+## 10. Extensibility
+
+The system is designed to be easily extended:
+
+* Add new subgraphs (e.g., Data Analysis, Visualization)
+* Introduce domain‑specific analyst agents
+* Plug in different LLMs or search tools
+* Adjust HITL checkpoints per use case
+
+---
+
+## 11. Example Flow
+
+```
+User defines topic
+  ▼
+Analyst agent created
+  ▼
+Human approves scope
+  ▼
+Retrieval & search subgraph runs
+  ▼
+Human validates sources
+  ▼
+Analysis & aggregation
+  ▼
+Introduction → Body → Conclusion
+  ▼
+Human approves final report
+```
+
+---
+
+## 12. Future Enhancements
+
+* Automated citation formatting
+* Confidence scoring for conclusions
+* Multi‑analyst collaboration
+* Interactive report refinement via chat
+
+---
+
+## Summary
+
+This agentic application provides a **robust, transparent, and human‑guided approach** to automated research report generation. By combining structured agent workflows with human oversight, it delivers reliable and scalable research outputs without sacrificing quality or trust.

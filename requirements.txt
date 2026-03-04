@@ -1,6 +1,9 @@
 langgraph
 langchain
 langchain-core
+langchain_community
+tavily-python
+wikipedia
 pydantic
 requests
 tqdm

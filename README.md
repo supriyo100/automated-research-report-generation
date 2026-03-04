@@ -1381,6 +1381,386 @@ def with_temp_file(session_id: str, filename: str):
 
 ## 20. LangGraph State & Graph Definition
 
+```mermaid
+graph TD
+
+    %% ============================================================
+    %% ENTERPRISE AGENTIC REPORT GENERATION — FULL ARCHITECTURE
+    %% All subgraphs · All tool calls · Retrieval · Validation · Planning
+    %% ============================================================
+
+    %% ── Entry Point ─────────────────────────────────────────────
+    User([👤 User: defines topic & constraints])
+        --> InGuard[🛡️ Input Guardrails\nPII Redaction · Prompt Injection Check]
+    InGuard --> CacheHit{📦 Semantic Cache Hit?}
+    CacheHit -- Yes --> Cached([⚡ Return Cached Report Instantly])
+    CacheHit -- No  --> Planner
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 1 — PLANNING & SCOPE ALIGNMENT
+    %% ════════════════════════════════════════════════════════════
+    subgraph P1 [Phase 1 · Planning & Scope Alignment]
+        direction TB
+        Planner[🧠 Planner Agent\nGenerates scope · outline · constraints]
+
+        subgraph P1_TOOLS [Planner Tool Calls]
+            direction LR
+            PT1[📁 Load User Brief]
+            PT2[📜 Retrieve Past Similar Reports\nfrom Vector Store]
+            PT3[🗂️ Fetch Domain Taxonomy\nOntology Lookup]
+            PT4[📐 Constraint Checker\nLength · Format · Audience · Deadline]
+        end
+
+        Planner --> PT1 & PT2 & PT3 & PT4
+
+        subgraph P1_PLAN [Plan Construction]
+            direction TB
+            PP1[📝 Draft Outline\nSections · Subsections · Word Budget]
+            PP2[🎯 Define Research Goals\nper Section]
+            PP3[⚠️ Flag Known Risks\nData Gaps · Sensitive Topics]
+            PP4[🗓️ Set Milestone Checkpoints\nPhase gates for Human review]
+        end
+
+        PT1 & PT2 & PT3 & PT4 --> PP1
+        PP1 --> PP2 --> PP3 --> PP4
+
+        P1Retry{🔁 Retry Circuit\nMax 3 attempts}
+        PP4 --> P1Retry
+        P1Retry -- Attempt 1–3 --> H1{👤 Human Approves Scope?}
+        P1Retry -- Max exceeded  --> P1Fallback[⚠️ Escalate:\npartial draft + risk flags]
+        H1 -- No · Feedback --> Planner
+        H1 -- Yes --> Outline([✅ Approved Outline\n+ Research Goals\n+ Risk Register])
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 2 — QUESTION GENERATION
+    %% ════════════════════════════════════════════════════════════
+    subgraph P2 [Phase 2 · Question Generation]
+        direction TB
+        QGen[🔍 Question Generator Agent\nDecomposes outline into atomic queries]
+
+        subgraph P2_TOOLS [QGen Tool Calls]
+            direction LR
+            QT1[🧬 NLP Decomposition\nEntity · Relation · Intent extraction]
+            QT2[🗺️ Query Router\nClassifies → Web · DB · Wiki · KB · API]
+            QT3[🌐 Query Expander\nSynonyms · Related terms · Multilingual]
+            QT4[📊 Priority Ranker\nScores queries by section importance]
+        end
+
+        Outline --> QGen
+        QGen --> QT1 --> QT2 --> QT3 --> QT4
+
+        subgraph P2_QPLAN [Query Plan]
+            direction TB
+            QP1[📋 Query Batch A\nHigh Priority — Critical sections]
+            QP2[📋 Query Batch B\nMedium Priority — Supporting evidence]
+            QP3[📋 Query Batch C\nLow Priority — Background context]
+            QP4[🔀 Async Parallel Dispatch\nAll batches fire simultaneously]
+        end
+
+        QT4 --> QP1 & QP2 & QP3
+        QP1 & QP2 & QP3 --> QP4
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 3 — HYBRID SEARCH & RETRIEVAL
+    %% ════════════════════════════════════════════════════════════
+    subgraph P3 [Phase 3 · Hybrid Search & Multi-Source Retrieval]
+        direction TB
+
+        subgraph P3_WEB [Web Search Tools]
+            direction LR
+            WS1[🌐 Web Search API\nGoogle · Bing · Brave]
+            WS2[📰 News API\nRecent articles · Press releases]
+            WS3[🔬 Academic Search\nArXiv · PubMed · Semantic Scholar]
+            WS4[🏛️ Gov & Regulatory\nFederal Register · EUR-Lex · Data.gov]
+        end
+
+        subgraph P3_DB [Database & Knowledge Tools]
+            direction LR
+            DB1[🗄️ Vector DB Lookup\nFAISS · Pinecone · Weaviate\nSemantic similarity search]
+            DB2[🔤 BM25 Keyword Search\nElastic · Opensearch\nExact term matching]
+            DB3[📚 Internal Knowledge Base\nCompany docs · Past reports · SOPs]
+            DB4[🔗 Structured DB Query\nSQL · GraphQL · REST APIs]
+        end
+
+        subgraph P3_SPEC [Specialist Tools]
+            direction LR
+            SP1[🧮 Wolfram Alpha\nMath · Statistics · Formulas]
+            SP2[📈 Financial Data API\nBloomberg · Yahoo Finance]
+            SP3[🗺️ Geospatial API\nMaps · Census · OSM data]
+            SP4[🧠 Domain Expert KB\nCurated ontologies · Taxonomies]
+        end
+
+        QP4 --> WS1 & WS2 & WS3 & WS4
+        QP4 --> DB1 & DB2 & DB3 & DB4
+        QP4 --> SP1 & SP2 & SP3 & SP4
+
+        subgraph P3_MERGE [Result Collection & Deduplication]
+            direction TB
+            RM1[🧹 Raw Result Aggregator\nCollects all source responses]
+            RM2[🔗 URL & Content Deduplicator\nRemoves exact + near-duplicates]
+            RM3[📦 Chunk Splitter\nSplits docs into 512-token passages]
+            RM4[🏷️ Metadata Tagger\nSource · Date · Domain · Confidence tier]
+        end
+
+        WS1 & WS2 & WS3 & WS4 --> RM1
+        DB1 & DB2 & DB3 & DB4 --> RM1
+        SP1 & SP2 & SP3 & SP4 --> RM1
+        RM1 --> RM2 --> RM3 --> RM4
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 4 — RERANKING & RELEVANCE FILTERING
+    %% ════════════════════════════════════════════════════════════
+    subgraph P4 [Phase 4 · Reranking & Relevance Filtering]
+        direction TB
+
+        subgraph P4_RERANK [Reranking Tools]
+            direction LR
+            RR1[📐 Cross-Encoder Reranker\nComputes query-passage similarity]
+            RR2[🎯 Contextual Compressor\nExtracts only relevant sentence spans]
+            RR3[📊 Diversity Sampler\nMMR — ensures source variety]
+            RR4[🗓️ Recency Scorer\nBoosts recent sources for time-sensitive topics]
+        end
+
+        RM4 --> RR1 & RR2 & RR3 & RR4
+
+        subgraph P4_SCORE [Scoring & Threshold Gate]
+            direction TB
+            SC1[🧮 Composite Score Calculator\nRelevance · Recency · Authority · Diversity]
+            SC2[🚦 Threshold Filter\nDrop passages below min score]
+            SC3[📋 Top-K Selector\nRetain top N passages per query]
+        end
+
+        RR1 & RR2 & RR3 & RR4 --> SC1 --> SC2 --> SC3
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 5 — EVALUATION, FACT EXTRACTION & CONFLICT DETECTION
+    %% ════════════════════════════════════════════════════════════
+    subgraph P5 [Phase 5 · Evaluator Agent · Fact Extraction & Conflict Detection]
+        direction TB
+        Eval[🔬 Evaluator Agent\nOrchestrates all validation sub-tasks]
+
+        subgraph P5_EXTRACT [Fact Extraction Tools]
+            direction LR
+            FE1[🏷️ Named Entity Recognizer\nPeople · Orgs · Dates · Locations]
+            FE2[🔗 Relation Extractor\nSubject–Predicate–Object triples]
+            FE3[📌 Claim Identifier\nIsolates verifiable assertions]
+            FE4[🔢 Numeric Validator\nChecks stats · percentages · units]
+        end
+
+        subgraph P5_CRED [Credibility Assessment Tools]
+            direction LR
+            CR1[🏛️ Source Authority Scorer\nDomain reputation · Citations · Bias ratings]
+            CR2[📅 Date & Freshness Check\nCompares source date vs topic recency needs]
+            CR3[🔍 Cross-Source Corroboration\nCounts independent confirmations per claim]
+            CR4[⚠️ Misinformation Flagging\nChecks against known false-claim registries]
+        end
+
+        subgraph P5_CONFLICT [Conflict Detection & Resolution]
+            direction TB
+            CD1[⚡ Contradiction Detector\nCompares claims across all sources]
+            CD2[📊 Confidence Scorer\nAssigns confidence per claim 0–1]
+            CD3[🗳️ Majority Vote Resolver\nAccepts claim if majority of sources agree]
+            CD4[🚩 Unresolved Conflict Register\nLogs all claims that cannot be auto-resolved]
+        end
+
+        SC3 --> Eval
+        Eval --> FE1 & FE2 & FE3 & FE4
+        Eval --> CR1 & CR2 & CR3 & CR4
+        FE1 & FE2 & FE3 & FE4 --> CD1
+        CR1 & CR2 & CR3 & CR4 --> CD1
+        CD1 --> CD2 --> CD3 --> CD4
+
+        P5Retry{🔁 Retry Circuit\nMax 3 attempts}
+        CD4 --> P5Retry
+        P5Retry -- Insufficient data · Refines queries --> QGen
+        P5Retry -- Max exceeded --> P5Fallback[⚠️ Proceed with low-confidence flags]
+
+        CD4 --> SuffCheck{✅ Sufficient\nHigh-Confidence Facts?}
+        SuffCheck -- No --> QGen
+        SuffCheck -- Yes --> ConflictCheck{⚠️ Unresolved\nConflicts or Sensitive?}
+        ConflictCheck -- Yes --> H2[👤 Human Validates\nFlagged Sources via RBAC]
+        ConflictCheck -- No  --> FactBase
+        H2 --> FactBase
+        P5Fallback --> FactBase
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 6 — VALIDATED FACT BASE CONSTRUCTION
+    %% ════════════════════════════════════════════════════════════
+    subgraph P6 [Phase 6 · Validated Fact Base Construction]
+        direction TB
+
+        subgraph P6_BUILD [Fact Base Builder Tools]
+            direction LR
+            FB1[🗂️ Claim Deduplicator\nMerges identical claims from multiple sources]
+            FB2[🔗 Citation Linker\nMaps every claim → source passage + URL]
+            FB3[📊 Confidence Annotator\nAttaches confidence score to each fact]
+            FB4[🗺️ Outline Mapper\nAligns every fact to the correct outline section]
+            FB5[🧩 Gap Analyzer\nIdentifies outline sections with insufficient facts]
+            FB6[📋 Fact Base Serializer\nOutputs structured JSON fact store]
+        end
+
+        FactBase([📋 Raw Validated Facts]) --> FB1 --> FB2 --> FB3 --> FB4
+        FB4 --> FB5
+        FB5 -- Gaps found --> QGen
+        FB5 -- No gaps    --> FB6
+        FB6 --> ValidatedFactBase([✅ Validated Fact Base\nCited · Scored · Outline-Aligned])
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 7 — SYNTHESIS
+    %% ════════════════════════════════════════════════════════════
+    subgraph P7 [Phase 7 · Synthesizer Agent]
+        direction TB
+        Synth[🗺️ Synthesizer Agent\nMaps facts to narrative structure]
+
+        subgraph P7_TOOLS [Synthesis Tool Calls]
+            direction LR
+            ST1[📐 Outline Section Loader\nLoads section goals + word budget]
+            ST2[🎯 Fact Selector\nPicks highest-confidence facts per section]
+            ST3[🔗 Narrative Thread Builder\nLinks facts into logical argument chains]
+            ST4[📊 Evidence Ranker\nOrders supporting evidence by strength]
+            ST5[⚡ Contradiction Pre-check\nFinal scan before passing to Writer]
+        end
+
+        ValidatedFactBase --> Synth
+        Synth --> ST1 & ST2 & ST3 & ST4 & ST5
+
+        subgraph P7_PLAN [Synthesis Plan Output]
+            direction TB
+            SP_A[📝 Section-by-Section Narrative Map\nFact IDs · Evidence order · Argument flow]
+            SP_B[📌 Key Takeaway Statements\nDraft thesis per section]
+            SP_C[🔗 Cross-Reference Index\nLinked citations ready for Writer]
+        end
+
+        ST1 & ST2 & ST3 & ST4 & ST5 --> SP_A --> SP_B --> SP_C
+        SP_C --> SynthPlan([✅ Synthesis Plan\nReady for Writer Agent])
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 8 — WRITING
+    %% ════════════════════════════════════════════════════════════
+    subgraph P8 [Phase 8 · Writer Agent]
+        direction TB
+
+        subgraph P8_TOOLS [Writer Tool Calls]
+            direction LR
+            WT1[✍️ Section Drafter\nGenerates prose per section from narrative map]
+            WT2[🔗 Citation Injector\nInlines footnotes + hyperlinks]
+            WT3[📏 Word Count Enforcer\nTrimming · expansion per budget]
+            WT4[🎨 Style Formatter\nApplies tone · register · template]
+            WT5[📑 Executive Summary Generator\nAuto-drafts from completed body]
+        end
+
+        SynthPlan --> WT1 --> WT2 --> WT3 --> WT4 --> WT5
+        WT5 --> RawDraft([📄 Raw Draft Report])
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% PHASE 9 — DECENTRALIZED QA
+    %% ════════════════════════════════════════════════════════════
+    subgraph P9 [Phase 9 · Decentralized QA · No God Agent]
+        direction TB
+        Broadcast{📡 Broadcast Draft\nto Specialized Critics}
+
+        subgraph P9_FACT [Fact-Checker Agent]
+            direction TB
+            FC1[🔎 Claim Extractor\nParses all verifiable claims from draft]
+            FC2[🗄️ Fact Base Lookup\nChecks each claim against Validated Fact Base]
+            FC3[⚠️ Hallucination Detector\nFlags claims with no source backing]
+            FC4[📊 Faithfulness Score\nRAGAS — claim-level precision]
+        end
+
+        subgraph P9_SCOPE [Alignment Agent]
+            direction TB
+            AL1[📐 Section Coverage Checker\nEvery outline section present?]
+            AL2[🎯 Goal Alignment Verifier\nDoes each section meet its research goal?]
+            AL3[⚖️ Constraint Validator\nWord count · audience · deadline met?]
+            AL4[📊 Relevance Score\nRAGAS — answer relevance metric]
+        end
+
+        subgraph P9_FORMAT [Format Agent]
+            direction TB
+            FM1[🖊️ Tone & Register Checker\nFormal · Neutral · Audience-appropriate]
+            FM2[📏 Structure Validator\nHeadings · Paragraphs · Flow]
+            FM3[🔗 Citation Completeness\nAll claims cited? Format correct?]
+            FM4[🧹 Readability Score\nFlesch · Gunning Fog index]
+        end
+
+        RawDraft --> Broadcast
+        Broadcast --> FC1 --> FC2 --> FC3 --> FC4
+        Broadcast --> AL1 --> AL2 --> AL3 --> AL4
+        Broadcast --> FM1 --> FM2 --> FM3 --> FM4
+
+        Agg[⚖️ Routing & Aggregation Node\nCollects all critic verdicts + scores]
+        FC4 --> Agg
+        AL4 --> Agg
+        FM4 --> Agg
+
+        TieBreak{🗳️ Tie-Breaker Logic}
+        Agg --> TieBreak
+        TieBreak -- Unanimous Pass        --> PassGate{✅ All Critics Pass?}
+        TieBreak -- Majority Pass 2 of 3  --> PassGate
+        TieBreak -- Tie or Majority Fail  --> WriterRetry
+
+        PassGate -- No · Targeted failure routes --> WriterRetry{🔁 Retry Circuit\nMax 3 attempts}
+        WriterRetry -- Attempt 1–3 · Specific feedback --> WT1
+        WriterRetry -- Max exceeded --> P9Fallback[⚠️ Escalate:\nannotated draft to Human]
+
+        PassGate -- Yes --> OutGuard[🛡️ Output Guardrails\nToxicity · Data Leak · PII re-check]
+        OutGuard --> H3{👤 Human Final Approval?}
+        H3 -- No · Minor tweaks --> WT1
+        H3 -- Yes --> SaveCache[(💾 Save to Semantic Cache DB)]
+        SaveCache --> Done([🏁 Final Report Delivered])
+        P9Fallback --> H3
+    end
+
+    %% ════════════════════════════════════════════════════════════
+    %% OBSERVABILITY LAYER
+    %% ════════════════════════════════════════════════════════════
+    subgraph OBS [🔭 Observability · Telemetry · Cost Monitoring — Wraps All Phases]
+        direction LR
+        O1[📈 Token & Cost Tracker\nper agent · per phase]
+        O2[⏱️ Latency Monitor\nP50 · P95 · P99 per node]
+        O3[🔁 Retry & Circuit-Breaker Log\nAll phases · attempt counts]
+        O4[📊 RAGAS Dashboard\nFaithfulness · Relevance · Precision live]
+        O5[🪵 Immutable Audit Trail\nAll decisions · tool calls · human inputs]
+        O6[🚨 Alert Manager\nBreaches SLA or quality thresholds → PagerDuty]
+    end
+
+    %% ── Styling ─────────────────────────────────────────────────
+    classDef human    fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef agent    fill:#cce5ff,stroke:#0056b3,stroke-width:2px,color:#004085;
+    classDef tool     fill:#e8daef,stroke:#7d3c98,stroke-width:1.5px,color:#4a235a;
+    classDef security fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404;
+    classDef data     fill:#e2e3e5,stroke:#6c757d,stroke-width:2px,color:#383d41;
+    classDef retry    fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24;
+    classDef fallback fill:#f9d0c4,stroke:#c0392b,stroke-width:2.5px,color:#7b241c;
+    classDef obs      fill:#eaf4fb,stroke:#2e86c1,stroke-width:1.5px,color:#1a5276;
+    classDef done     fill:#d5f5e3,stroke:#1e8449,stroke-width:2px,color:#145a32;
+    classDef plan     fill:#fef9e7,stroke:#d4ac0d,stroke-width:2px,color:#7d6608;
+
+    class H1,H2,H3 human;
+    class Planner,QGen,Eval,Synth,WT1,FactCheck,ScopeCheck,ToneCheck,Broadcast,Agg agent;
+    class PT1,PT2,PT3,PT4,QT1,QT2,QT3,QT4,WS1,WS2,WS3,WS4 tool;
+    class DB1,DB2,DB3,DB4,SP1,SP2,SP3,SP4,RR1,RR2,RR3,RR4 tool;
+    class FE1,FE2,FE3,FE4,CR1,CR2,CR3,CR4,CD1,CD2,CD3,CD4 tool;
+    class FB1,FB2,FB3,FB4,FB5,FB6,ST1,ST2,ST3,ST4,ST5 tool;
+    class WT2,WT3,WT4,WT5,FC1,FC2,FC3,FC4,AL1,AL2,AL3,AL4 tool;
+    class FM1,FM2,FM3,FM4 tool;
+    class InGuard,OutGuard security;
+    class Outline,ValidatedFactBase,SynthPlan,SaveCache data;
+    class P1Retry,P2Retry,P5Retry,WriterRetry retry;
+    class P1Fallback,P2Fallback,P5Fallback,P9Fallback fallback;
+    class O1,O2,O3,O4,O5,O6 obs;
+    class Done,Cached done;
+    class PP1,PP2,PP3,PP4,QP1,QP2,QP3,QP4,SP_A,SP_B,SP_C plan;
+```
+
 ### Full Graph (`graph/graph.py`)
 
 ```python
